@@ -11,6 +11,7 @@ let server = app.listen(3000, function () {
 const superagent = require('superagent');
 
 let hotNews = []; // 热点新闻
+let localNews = []; // 本地新闻
 
 /**
  * index.js
@@ -50,6 +51,56 @@ function getHotNews(res) {
   return hotNews;
 }
 
+const Nightmare = require('nightmare'); // 自动化测试包，处理动态页面
+const nightmare = Nightmare({ show: true }); // show:true  显示内置模拟浏览器
+
+/**
+ * [description] - 抓取本地新闻页面
+ * [nremark] - 百度本地新闻在访问页面后加载js定位IP位置后获取对应新闻，
+ * 所以抓取本地新闻需要使用 nightmare 一类的自动化测试工具，
+ * 模拟浏览器环境访问页面，使js运行，生成动态页面再抓取
+ */
+// 抓取本地新闻页面
+nightmare
+  .goto('http://news.baidu.com/')
+  .wait('div#local_news')
+  .evaluate(() => document.querySelector('div#local_news').innerHTML)
+  .then(htmlStr => {
+    // 获取本地新闻数据
+    localNews = getLocalNews(htmlStr);
+  })
+  .catch(error => {
+    console.log(`本地新闻抓取失败 - ${error}`);
+  });
+
+/**
+ * [description]- 获取本地新闻数据
+ */
+function getLocalNews(htmlStr) {
+  let localNews = [];
+  let $ = cheerio.load(htmlStr);
+
+  // 本地新闻
+  $('ul#localnews-focus li a').each((idx, ele) => {
+    let news = {
+      title: $(ele).text(),
+      href: $(ele).attr('href'),
+    };
+    localNews.push(news);
+  });
+
+  // 本地资讯
+  $('div#localnews-zixun ul li a').each((index, item) => {
+    let news = {
+      title: $(item).text(),
+      href: $(item).attr('href'),
+    };
+    localNews.push(news);
+  });
+
+  return localNews;
+}
+
 app.get('/', function (req, res) {
-  res.send(hotNews);
+  res.send({ hotNews, localNews });
 });
